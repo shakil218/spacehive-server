@@ -31,6 +31,32 @@ async function run() {
 
     const database = client.db(process.env.DB_NAME);
 
+    const spacesCollection = database.collection("spaces");
+
+
+
+    // ===========================
+    // Spaces API
+    // ===========================
+
+    app.get("/api/spaces", async (_req, res) => {
+      const spaces = await spacesCollection
+        .find()
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      res.send(spaces);
+    });
+
+    app.get("/api/spaces/featured", async (_req, res) => {
+      const spaces = await spacesCollection
+        .find()
+        .sort({ rating: -1 })
+        .limit(8)
+        .toArray();
+
+      res.send(spaces);
+    });
     
 
     await client.db("admin").command({
