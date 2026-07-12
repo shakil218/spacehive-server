@@ -36,15 +36,107 @@ async function run() {
     // Spaces API
     // ===========================
 
-    app.get("/api/spaces", async (_req, res) => {
-      const spaces = await spacesCollection
-        .find()
-        .sort({ createdAt: -1 })
-        .toArray();
+    // Get All Spaces
+    app.get("/api/spaces", async (req, res) => {
+      try {
+        const {
+          search = "",
+          category,
+          location,
+          rating,
+          sort = "newest",
+          page = "1",
+          limit = "8",
+        } = req.query;
 
-      res.send(spaces);
+        // -----------------------------
+        // Query
+        // -----------------------------
+        const query: any = {};
+
+        // Search
+        if (search) {
+          query.title = {
+            $regex: search.toString(),
+            $options: "i",
+          };
+        }
+
+        // Category
+        if (category && category !== "All") {
+          query.category = category;
+        }
+
+        // Location
+        if (location && location !== "All") {
+          query.location = category;
+        }
+
+        // Rating
+        if (rating) {
+          query.rating = {
+            $gte: Number(rating),
+          };
+        }
+
+        // -----------------------------
+        // Sorting
+        // -----------------------------
+        let sortQuery: Record<string, 1 | -1>;
+
+        switch (sort) {
+          case "rating":
+            sortQuery = { rating: -1 };
+            break;
+
+          case "price-low":
+            sortQuery = { price: 1 };
+            break;
+
+          case "price-high":
+            sortQuery = { price: -1 };
+            break;
+
+          default:
+            sortQuery = { _id: -1 };
+        }
+
+        // -----------------------------
+        // Pagination
+        // -----------------------------
+        const currentPage = Number(page);
+        const pageSize = Number(limit);
+
+        const skip = (currentPage - 1) * pageSize;
+
+        const totalSpaces = await spacesCollection.countDocuments(query);
+
+        const spaces = await spacesCollection
+          .find(query)
+          .sort(sortQuery)
+          .skip(skip)
+          .limit(pageSize)
+          .toArray();
+
+        res.status(200).send({
+          success: true,
+          spaces,
+          totalSpaces,
+          currentPage,
+          totalPages: Math.ceil(totalSpaces / pageSize),
+          limit: pageSize,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch spaces",
+        });
+      }
     });
 
+    // Get Featured Spaces
     app.get("/api/spaces/featured", async (_req, res) => {
       const spaces = await spacesCollection
         .find()
@@ -53,6 +145,17 @@ async function run() {
         .toArray();
 
       res.send(spaces);
+    });
+
+    // Get Single Space
+    app.get("/api/spaces/:id", async (req, res) => {
+      const { id } = req.params;
+
+      const space = await spacesCollection.findOne({
+        _id: new ObjectId(id),
+      });
+
+      res.send(space);
     });
 
     // ===========================
