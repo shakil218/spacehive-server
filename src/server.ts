@@ -20,7 +20,6 @@ const uri = process.env.MONGO_URI!;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
-    strict: true,
     deprecationErrors: true,
   },
 });
@@ -32,8 +31,6 @@ async function run() {
     const database = client.db(process.env.DB_NAME);
 
     const spacesCollection = database.collection("spaces");
-
-
 
     // ===========================
     // Spaces API
@@ -57,7 +54,47 @@ async function run() {
 
       res.send(spaces);
     });
-    
+
+    // ===========================
+    // Spaces Stats API
+    // ===========================
+    app.get("/api/stats", async (_req, res) => {
+      try {
+        const [totalSpaces, totalCategories, totalLocations, avgResult] =
+          await Promise.all([
+            spacesCollection.countDocuments(),
+
+            spacesCollection
+              .aggregate([{ $group: { _id: "$category" } }])
+              .toArray(),
+
+            spacesCollection
+              .aggregate([{ $group: { _id: "$location" } }])
+              .toArray(),
+
+            spacesCollection
+              .aggregate([
+                {
+                  $group: {
+                    _id: null,
+                    avgRating: { $avg: "$rating" },
+                  },
+                },
+              ])
+              .toArray(),
+          ]);
+
+        res.send({
+          totalSpaces,
+          totalCategories: totalCategories.length,
+          totalLocations: totalLocations.length,
+          avgRating: avgResult[0]?.avgRating?.toFixed(1) ?? "0.0",
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to fetch stats" });
+      }
+    });
 
     await client.db("admin").command({
       ping: 1,
