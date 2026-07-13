@@ -31,6 +31,7 @@ async function run() {
     const database = client.db(process.env.DB_NAME);
 
     const spacesCollection = database.collection("spaces");
+    const bookingsCollection = database.collection("bookings");
 
     // ===========================
     // Spaces API
@@ -231,6 +232,37 @@ async function run() {
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Failed to fetch stats" });
+      }
+    });
+
+    // ===========================
+    // Bookings API
+    // ===========================
+
+    // Create Booking
+    app.post("/api/bookings", async (req, res) => {
+      try {
+        const booking = {
+          ...req.body,
+          paymentStatus: "pending",
+          bookingStatus: "pending",
+          createdAt: new Date(),
+        };
+
+        const result = await bookingsCollection.insertOne(booking);
+
+        res.status(201).send({
+          success: true,
+          insertedId: result.insertedId,
+          booking,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to create booking",
+        });
       }
     });
 
