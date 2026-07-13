@@ -158,6 +158,41 @@ async function run() {
       res.send(space);
     });
 
+    // Get Related Spaces
+    app.get("/api/spaces/related/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const currentSpace = await spacesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!currentSpace) {
+          return res.status(404).send({
+            message: "Space not found",
+          });
+        }
+
+        const relatedSpaces = await spacesCollection
+          .find({
+            _id: {
+              $ne: new ObjectId(id),
+            },
+            category: currentSpace.category,
+          })
+          .limit(4)
+          .toArray();
+
+        res.send(relatedSpaces);
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          message: "Failed to fetch related spaces",
+        });
+      }
+    });
+
     // ===========================
     // Spaces Stats API
     // ===========================
