@@ -5,12 +5,12 @@ import express from "express";
 import cors from "cors";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import { getStripe } from "./lib/stripe.js";
+import { stripeWebhookHandler } from "./controllers/stripeWebhook.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
 
 app.get("/", (_req, res) => {
   res.send("🚀 SpaceHive Server Running...");
@@ -33,6 +33,18 @@ async function run() {
 
     const spacesCollection = database.collection("spaces");
     const bookingsCollection = database.collection("bookings");
+
+    // Stripe Webhook (must use raw body)
+    app.post(
+      "/api/stripe/webhook",
+      express.raw({ type: "application/json" }),
+      stripeWebhookHandler({
+        bookingsCollection,
+      }),
+    );
+
+    // Parse JSON for all remaining routes
+    app.use(express.json());
 
     // ===========================
     // Spaces API
