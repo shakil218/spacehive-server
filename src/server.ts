@@ -1,9 +1,10 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
-
-dotenv.config();
+import { getStripe } from "./lib/stripe.js";
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -244,8 +245,13 @@ async function run() {
       try {
         const booking = {
           ...req.body,
+
           paymentStatus: "pending",
           bookingStatus: "pending",
+
+          stripeSessionId: null,
+          stripePaymentIntentId: null,
+
           createdAt: new Date(),
         };
 
@@ -262,6 +268,84 @@ async function run() {
         res.status(500).send({
           success: false,
           message: "Failed to create booking",
+        });
+      }
+    });
+
+    // Create Checkout Session
+    app.post("/api/create-checkout-session", async (req, res) => {
+      try {
+        const stripe = getStripe();
+
+        const { bookingId } = req.body;
+
+        if (!bookingId) {
+          return res.status(400).send({
+            success: false,
+            message: "Booking ID is required",
+          });
+        }
+
+        const booking = await bookingsCollection.findOne({
+          _id: new ObjectId(bookingId),
+        });
+
+        if (!booking) {
+          return res.status(404).send({
+            success: false,
+            message: "Booking not found",
+          });
+        }
+
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+
+          payment_method_types: ["card"],
+
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: "usd",
+                unit_amount: booking.totalPrice * 100,
+                product_data: {
+                  name: booking.title,
+                  images: [booking.imageUrl],
+                },
+              },
+            },
+          ],
+
+          metadata: {
+            bookingId: booking._id.toString(),
+            userId: booking.userId,
+            spaceId: booking.spaceId,
+          },
+
+          success_url: `${process.env.CLIENT_URL}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+
+          cancel_url: `${process.env.CLIENT_URL}/booking/cancel`,
+        });
+
+        await bookingsCollection.updateOne(
+          { _id: booking._id },
+          {
+            $set: {
+              stripeSessionId: session.id,
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          url: session.url,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to create checkout session",
         });
       }
     });
