@@ -252,6 +252,41 @@ async function run() {
     // Bookings API
     // ===========================
 
+    // Get User Bookings
+    app.get("/api/bookings/user/:userId", async (req, res) => {
+      try {
+        const { userId } = req.params;
+
+        if (!userId) {
+          return res.status(400).send({
+            success: false,
+            message: "User ID is required",
+          });
+        }
+
+        const bookings = await bookingsCollection
+          .find({
+            userId,
+          })
+          .sort({
+            createdAt: -1,
+          })
+          .toArray();
+
+        res.send({
+          success: true,
+          bookings,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch user bookings",
+        });
+      }
+    });
+
     // Create Booking
     app.post("/api/bookings", async (req, res) => {
       try {
