@@ -405,6 +405,47 @@ async function run() {
       }
     });
 
+    // Delete Booking
+    app.delete("/api/bookings/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const booking = await bookingsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!booking) {
+          return res.status(404).send({
+            success: false,
+            message: "Booking not found",
+          });
+        }
+
+        if (booking.bookingStatus !== "cancelled") {
+          return res.status(400).send({
+            success: false,
+            message: "Only cancelled bookings can be deleted",
+          });
+        }
+
+        await bookingsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send({
+          success: true,
+          message: "Booking deleted successfully",
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to delete booking",
+        });
+      }
+    });
+
     // ===========================
     // Payment API
     // ===========================
