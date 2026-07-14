@@ -317,6 +317,92 @@ async function run() {
       }
     });
 
+    // User Booking Statistics
+    app.get("/api/user/bookings/statistics/:userId", async (req, res) => {
+      try {
+        const { userId } = req.params;
+
+        const bookings = await bookingsCollection
+          .find({
+            userId,
+          })
+          .toArray();
+
+        // Summary Statistics
+
+        const totalBookings = bookings.length;
+
+        const confirmedBookings = bookings.filter(
+          (booking) => booking.bookingStatus === "confirmed",
+        ).length;
+
+        const cancelledBookings = bookings.filter(
+          (booking) => booking.bookingStatus === "cancelled",
+        ).length;
+
+        const totalSpent = bookings
+          .filter((booking) => booking.paymentStatus === "paid")
+          .reduce(
+            (total, booking) => total + Number(booking.totalPrice || 0),
+            0,
+          );
+
+        // Monthly Chart Data
+
+        const monthlyStatistics = {};
+
+        bookings.forEach((booking) => {
+          const date = new Date(booking.bookingDate);
+
+          const month = date.toLocaleString("default", {
+            month: "short",
+          });
+
+          if (!monthlyStatistics[month]) {
+            monthlyStatistics[month] = {
+              month,
+              bookings: 0,
+              spending: 0,
+            };
+          }
+
+          monthlyStatistics[month].bookings += 1;
+
+          if (booking.paymentStatus === "paid") {
+            monthlyStatistics[month].spending += Number(
+              booking.totalPrice || 0,
+            );
+          }
+        });
+
+        const chartData = Object.values(monthlyStatistics);
+
+        res.send({
+          success: true,
+
+          summary: {
+            totalBookings,
+
+            confirmedBookings,
+
+            cancelledBookings,
+
+            totalSpent,
+          },
+
+          chartData,
+        });
+      } catch (error) {
+        console.log(error);
+
+        res.status(500).send({
+          success: false,
+
+          message: "Failed to load booking statistics",
+        });
+      }
+    });
+
     // Create Booking
     app.post("/api/bookings", async (req, res) => {
       try {
