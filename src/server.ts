@@ -287,6 +287,36 @@ async function run() {
       }
     });
 
+    // Get Single Booking
+    app.get("/api/bookings/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const booking = await bookingsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!booking) {
+          return res.status(404).send({
+            success: false,
+            message: "Booking not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          booking,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to fetch booking",
+        });
+      }
+    });
+
     // Create Booking
     app.post("/api/bookings", async (req, res) => {
       try {
