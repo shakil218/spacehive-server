@@ -328,7 +328,9 @@ async function run() {
           })
           .toArray();
 
+        // =============================
         // Summary Statistics
+        // =============================
 
         const totalBookings = bookings.length;
 
@@ -347,9 +349,18 @@ async function run() {
             0,
           );
 
+        // =============================
         // Monthly Chart Data
+        // =============================
 
-        const monthlyStatistics = {};
+        type MonthlyStatistics = {
+          month: string;
+          bookings: number;
+          cancelledBookings: number;
+          spending: number;
+        };
+
+        const monthlyStatistics: Record<string, MonthlyStatistics> = {};
 
         bookings.forEach((booking) => {
           const date = new Date(booking.bookingDate);
@@ -362,12 +373,20 @@ async function run() {
             monthlyStatistics[month] = {
               month,
               bookings: 0,
+              cancelledBookings: 0,
               spending: 0,
             };
           }
 
+          // Total bookings
           monthlyStatistics[month].bookings += 1;
 
+          // Cancelled bookings
+          if (booking.bookingStatus === "cancelled") {
+            monthlyStatistics[month].cancelledBookings += 1;
+          }
+
+          // Total spending
           if (booking.paymentStatus === "paid") {
             monthlyStatistics[month].spending += Number(
               booking.totalPrice || 0,
@@ -375,29 +394,50 @@ async function run() {
           }
         });
 
-        const chartData = Object.values(monthlyStatistics);
+        // =============================
+        // Sort Months
+        // =============================
+
+        const monthOrder = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        const chartData = Object.values(monthlyStatistics).sort(
+          (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
+        );
+
+        // =============================
+        // Response
+        // =============================
 
         res.send({
           success: true,
 
           summary: {
             totalBookings,
-
             confirmedBookings,
-
             cancelledBookings,
-
             totalSpent,
           },
 
           chartData,
         });
       } catch (error) {
-        console.log(error);
+        console.error(error);
 
         res.status(500).send({
           success: false,
-
           message: "Failed to load booking statistics",
         });
       }
