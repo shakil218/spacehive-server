@@ -319,6 +319,66 @@ async function run() {
       }
     });
 
+    // Cancel Booking
+    app.patch("/api/bookings/:id/cancel", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const booking = await bookingsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!booking) {
+          return res.status(404).send({
+            success: false,
+            message: "Booking not found",
+          });
+        }
+
+        if (booking.paymentStatus === "paid") {
+          return res.status(400).send({
+            success: false,
+            message: "Paid bookings cannot be cancelled.",
+          });
+        }
+
+        if (booking.bookingStatus === "cancelled") {
+          return res.status(400).send({
+            success: false,
+            message: "Booking is already cancelled.",
+          });
+        }
+
+        await bookingsCollection.updateOne(
+          {
+            _id: booking._id,
+          },
+          {
+            $set: {
+              bookingStatus: "cancelled",
+              cancelledAt: new Date(),
+            },
+          },
+        );
+
+        res.send({
+          success: true,
+          message: "Booking cancelled successfully.",
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to cancel booking.",
+        });
+      }
+    });
+
+    // ===========================
+    // Payment API
+    // ===========================
+
     // Create Checkout Session
     app.post("/api/create-checkout-session", async (req, res) => {
       try {
