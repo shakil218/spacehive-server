@@ -171,6 +171,123 @@ async function run() {
     });
 
     // ===========================
+    // Admin Dashboard API
+    // ===========================
+    app.get("/api/admin/dashboard", async (_req, res) => {
+      try {
+        // =============================
+        // Summary
+        // =============================
+
+        const totalUsers = await usersCollection.countDocuments();
+
+        const totalSpaces = await spacesCollection.countDocuments();
+
+        const totalBookings = await bookingsCollection.countDocuments();
+
+        const paidBookings = await bookingsCollection
+          .find({ paymentStatus: "paid" })
+          .toArray();
+
+        const totalRevenue = paidBookings.reduce(
+          (total, booking) => total + Number(booking.totalPrice || 0),
+          0,
+        );
+
+        // =============================
+        // Monthly Statistics
+        // =============================
+
+        type MonthlyStatistics = {
+          month: string;
+          bookings: number;
+          revenue: number;
+        };
+
+        const monthlyStatistics: Record<string, MonthlyStatistics> = {};
+
+        paidBookings.forEach((booking) => {
+          const date = new Date(booking.bookingDate);
+
+          const month = date.toLocaleString("default", {
+            month: "short",
+          });
+
+          if (!monthlyStatistics[month]) {
+            monthlyStatistics[month] = {
+              month,
+              bookings: 0,
+              revenue: 0,
+            };
+          }
+
+          monthlyStatistics[month].bookings += 1;
+
+          monthlyStatistics[month].revenue += Number(booking.totalPrice || 0);
+        });
+
+        const monthOrder = [
+          "Jan",
+          "Feb",
+          "Mar",
+          "Apr",
+          "May",
+          "Jun",
+          "Jul",
+          "Aug",
+          "Sep",
+          "Oct",
+          "Nov",
+          "Dec",
+        ];
+
+        const chartData = Object.values(monthlyStatistics).sort(
+          (a, b) => monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month),
+        );
+
+        // =============================
+        // Recent Payments
+        // =============================
+
+        const recentPayments = await bookingsCollection
+          .find({
+            paymentStatus: "paid",
+          })
+          .sort({
+            bookingDate: -1,
+          })
+          .limit(5)
+          .toArray();
+
+        // =============================
+        // Response
+        // =============================
+
+        res.send({
+          success: true,
+
+          summary: {
+            totalUsers,
+            totalSpaces,
+            totalBookings,
+            totalRevenue,
+          },
+
+          chartData,
+
+          recentPayments,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to load admin dashboard",
+        });
+      }
+    });
+
+    // ===========================
     // Spaces API
     // ===========================
 
@@ -359,7 +476,7 @@ async function run() {
     });
 
     // ===========================
-    // Spaces Stats API
+    // Users Stats API
     // ===========================
     app.get("/api/stats", async (_req, res) => {
       try {
