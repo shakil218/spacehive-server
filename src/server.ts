@@ -82,9 +82,9 @@ async function run() {
         }
 
         // Location
-        if (location && location !== "All") {
-          query.location = category;
-        }
+        // if (location && location !== "All") {
+        //   query.location = location;
+        // }
 
         // Rating
         if (rating) {
@@ -203,6 +203,38 @@ async function run() {
 
         res.status(500).send({
           message: "Failed to fetch related spaces",
+        });
+      }
+    });
+
+    // Create Space
+    app.post("/api/spaces", async (req, res) => {
+      try {
+        const newSpace = {
+          ...req.body,
+
+          rating: 0,
+          totalReviews: 0,
+          totalBookings: 0,
+
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        const result = await spacesCollection.insertOne(newSpace);
+
+        res.status(201).send({
+          success: true,
+          message: "Space created successfully",
+          insertedId: result.insertedId,
+          data: newSpace,
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to create space",
         });
       }
     });
