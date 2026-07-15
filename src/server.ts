@@ -80,6 +80,96 @@ async function run() {
       }
     });
 
+    // Update User Role
+    app.patch("/api/users/:id/role", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { role } = req.body;
+
+        if (!["user", "admin"].includes(role)) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid role",
+          });
+        }
+
+        const result = await usersCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              role,
+            },
+          },
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "User role updated successfully",
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to update user role",
+        });
+      }
+    });
+
+    // Update User Status
+    app.patch("/api/users/:id/status", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!["active", "blocked"].includes(status)) {
+          return res.status(400).send({
+            success: false,
+            message: "Invalid status",
+          });
+        }
+
+        const result = await usersCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+          },
+          {
+            $set: {
+              status,
+            },
+          },
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "User not found",
+          });
+        }
+
+        res.send({
+          success: true,
+          message: "User status updated successfully",
+        });
+      } catch (error) {
+        console.error(error);
+
+        res.status(500).send({
+          success: false,
+          message: "Failed to update user status",
+        });
+      }
+    });
+
     // ===========================
     // Spaces API
     // ===========================
