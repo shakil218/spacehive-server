@@ -1,70 +1,48 @@
 import { Request, Response } from "express";
-import { ObjectId } from "mongodb";
-
+import { Collection, ObjectId } from "mongodb";
 import { getStripe } from "../lib/stripe.js";
 
-
-interface StripeWebhookDependencies {
-  bookingsCollection: any;
+interface WebhookContext {
+  bookingsCollection: Collection;
 }
 
-export const stripeWebhookHandler =
-({ bookingsCollection }: StripeWebhookDependencies) =>
-  async (req: Request, res: Response) => {
-    const signature = req.headers["stripe-signature"] as string;
+export const stripeWebhookHandler = (context: WebhookContext) => {
+  return async (req: Request, res: Response) => {
     const stripe = getStripe();
+    const sig = req.headers["stripe-signature"] as string;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
 
     try {
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET!
-      );
-    } catch (err) {
-      console.error("Webhook signature verification failed:", err);
-
-      return res.status(400).send("Invalid signature");
+      // req.body must be the raw Buffer provided by express.raw()
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret!);
+    } catch (err: any) {
+      console.error("❌ Webhook Signature Verification Failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    try {
-      switch (event.type) {
-        case "checkout.session.completed": {
-          const session = event.data.object;
+    // Handle the event
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const bookingId = session.metadata?.bookingId;
 
-          const bookingId = session.metadata?.bookingId;
-
-          if (!bookingId) break;
-
-          await bookingsCollection.updateOne(
-            {
-              _id: new ObjectId(bookingId),
+      if (bookingId) {
+        await context.bookingsCollection.updateOne(
+          { _id: new ObjectId(`${bookingId}`) },
+          {
+            $set: {
+              paymentStatus: "paid",
+              bookingStatus: "confirmed",
+              stripePaymentIntentId: session.payment_intent as string,
+              paidAt: new Date(),
             },
-            {
-              $set: {
-                paymentStatus: "paid",
-                bookingStatus: "confirmed",
-                stripeSessionId: session.id,
-                stripePaymentIntentId: session.payment_intent,
-                paidAt: new Date(),
-              },
-            }
-          );
-
-          console.log("✅ Booking confirmed:", bookingId);
-
-          break;
-        }
-
-        default:
-          console.log(`Unhandled event: ${event.type}`);
+          }
+        );
+        console.log(`✅ Booking ${bookingId} successfully confirmed via Stripe!`);
       }
-
-      res.sendStatus(200);
-    } catch (error) {
-      console.error(error);
-
-      res.sendStatus(500);
     }
+
+    res.json({ received: true });
   };
+};
