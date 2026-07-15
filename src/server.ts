@@ -31,6 +31,7 @@ async function run() {
 
     const database = client.db(process.env.DB_NAME);
 
+    const usersCollection = database.collection("user");
     const spacesCollection = database.collection("spaces");
     const bookingsCollection = database.collection("bookings");
 
@@ -45,6 +46,39 @@ async function run() {
 
     // Parse JSON for all remaining routes
     app.use(express.json());
+
+    // ===========================
+    // Users API
+    // ===========================
+
+    // Get All Users
+    app.get("/api/users", async (_req, res) => {
+      try {
+        const users = await usersCollection
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        const formattedUsers = users.map((user) => ({
+          ...user,
+          role: user.role ?? "user",
+          status: user.status ?? "active",
+        }));
+
+        return res.status(200).send({
+          success: true,
+          message: "Users fetched successfully",
+          users: formattedUsers,
+        });
+      } catch (error) {
+        console.error("Get Users Error:", error);
+
+        return res.status(500).send({
+          success: false,
+          message: "Failed to fetch users",
+        });
+      }
+    });
 
     // ===========================
     // Spaces API
@@ -80,11 +114,6 @@ async function run() {
         if (category && category !== "All") {
           query.category = category;
         }
-
-        // Location
-        // if (location && location !== "All") {
-        //   query.location = location;
-        // }
 
         // Rating
         if (rating) {
